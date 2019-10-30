@@ -1,0 +1,58 @@
+#!ipxe
+   set menu-timeout 2000
+   set menu-default winpe
+   set proto:string http
+   isset ${ip} || dhcp
+   set next-server ${proxydhcp/next-server}
+
+
+:start
+
+  menu UEFI Windows_installer ---- iPXE
+  item --gap               IP Addreee : ${ip}
+  item --gap               MAC Address: ${mac}
+  item --gap               DHCP Server: ${dhcp-server}
+  item --gap               proxyDHCP Server: ${proxydhcp/dhcp-server}
+  item --gap               UUID: ${uuid}
+  item --gap --             ---------------------------------------------------------------------
+  item win10               Windows 10 RTM 14393.953 x64
+  item gparted             gparted-live-0.28.1-1-amd64
+
+  item shell                  Drop tp iPXE shell
+  item --key r reboot         Reboot computer [R]
+
+  choose --timeout ${menu-timeout} --default ${menu-default} selected
+  goto ${selected}
+
+
+:shell
+  echo Type 'exit' to get the back to the menu
+  shell
+  goto start
+ 
+:reboot
+  reboot
+ 
+
+:win10
+  kernel ${proto}://${next-server}/boot/wimboot || goto retry
+  initrd ${proto}://${next-server}/boot/bootmgfw.efi   bootmgfw.efi  || goto retry
+  initrd ${proto}://${next-server}/boot/startnet.cmd  startnet.cmd || goto retry
+  initrd ${proto}://${next-server}/boot/BCD       BCD  || goto retry
+  initrd ${proto}://${next-server}/boot/BOOT.SDI   BOOT.SDI  || goto retry
+  initrd ${proto}://${next-server}/boot/BOOT.WIM   BOOT.WIM  || goto retry
+  boot || goto retry
+  goto start
+
+
+:gparted
+  kernel ${proto}://${next-server}/gparted/vmlinuz
+  initrd ${proto}://${next-server}/gparted/initrd.img 
+  imgargs vmlinuz initrd=initrd.img boot=live config components union=overlay username=user noswap noeject ip= vga=788 fetch=${proto}://${next-server}/gparted/filesystem.squashfs
+  boot
+
+
+:retry
+  imgfree
+  prompt Error! press any key to back menu
+  goto start
